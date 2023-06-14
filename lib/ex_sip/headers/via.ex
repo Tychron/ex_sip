@@ -19,6 +19,12 @@ defmodule ExSip.Headers.Via do
 
   alias __MODULE__, as: Via
 
+  @spec decode!(binary(), Keyword.t()) :: t()
+  def decode!(blob, options \\ []) when is_binary(blob) do
+    {:ok, via} = decode(blob, options)
+    via
+  end
+
   @spec decode(binary(), Keyword.t()) :: {:ok, t()}
   def decode(blob, options \\ []) when is_binary(blob) do
     blob = String.trim_leading(blob)
