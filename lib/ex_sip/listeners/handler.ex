@@ -39,17 +39,22 @@ defmodule ExSip.Listeners.Handler do
       end
 
       @doc false
+      def decode_message(blob, state) do
+        case ExSip.Message.decode(blob) do
+          {:ok, message} ->
+            {:ok, message, state}
+
+          {:error, reason} ->
+            {:error, reason, state}
+        end
+      end
+
+      @doc false
       def handle_message(_source, _message, state) do
         {:ok, state}
       end
 
-      defoverridable [
-        init: 1,
-        terminate: 2,
-        handle_unbound: 1,
-        handle_bound: 1,
-        handle_message: 3
-      ]
+      defoverridable ExSip.Listeners.Handler
     end
   end
 
@@ -76,6 +81,10 @@ defmodule ExSip.Listeners.Handler do
   @callback handle_info(message::any(), state::any()) ::
     {:noreply, any()}
     | {:stop, reason::any(), any()}
+
+  @callback decode_message(blob::binary(), state::any()) ::
+    {:ok, message::any(), any()}
+    | {:error, reason::any(), any()}
 
   @callback handle_message(source::any(), Message.t(), state::any()) ::
     {:ok, any()}
@@ -142,6 +151,16 @@ defmodule ExSip.Listeners.Handler do
 
       {:stop, reason, handler_state} ->
         {:stop, reason, %{state | handler_state: handler_state}}
+    end
+  end
+
+  def decode_message(blob, %State{} = state) do
+    case state.handler.decode_message(blob, state.handler_state) do
+      {:ok, message, handler_state} ->
+        {:ok, message, %{state | handler_state: handler_state}}
+
+      {:error, reason, handler_state} ->
+        {:error, reason, %{state | handler_state: handler_state}}
     end
   end
 

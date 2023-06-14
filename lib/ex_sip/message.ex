@@ -172,6 +172,19 @@ defmodule ExSip.Message do
   end
 
   @doc """
+  Retrieve the values for specified header key
+
+  Usage:
+
+      values = Message.all_headers(message, "via")
+
+  """
+  @spec all_headers(Message.t(), String.t()) :: [any()]
+  def all_headers(%Message{} = message, key) do
+    Proplist.all(message.headers, key)
+  end
+
+  @doc """
   Decode a blob into a Message.
 
   Options:

@@ -5,7 +5,6 @@ defmodule ExSip.Listeners.UDP do
 
   alias ExSip.Listeners.State
   alias ExSip.Listeners.Handler
-  alias ExSip.Message
 
   import ExSip.ErrorLogger
 
@@ -188,15 +187,18 @@ defmodule ExSip.Listeners.UDP do
 
   @impl true
   def handle_event(:info, {@socket_key, :received_data, source, blob}, :loop, %State{} = state) do
-    case Message.decode(blob) do
-      {:ok, %Message{} = message} ->
+    case Handler.decode_message(blob, state) do
+      {:ok, message, %State{} = state} ->
         case Handler.handle_message(source, message, state) do
-          {:ok, state} ->
+          {:ok, %State{} = state} ->
             {:keep_state, state}
 
           {:stop, reason, state} ->
             {:stop, reason, state}
         end
+
+      {:error, _reason, state} ->
+        {:keep_state, state}
     end
   rescue ex ->
     log_error_and_reraise(ex, __STACKTRACE__)

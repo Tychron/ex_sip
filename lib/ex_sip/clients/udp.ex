@@ -7,7 +7,7 @@ defmodule ExSip.Clients.UDP do
 
   @spec open(Keyword.t()) :: {:ok, State.t()} | {:error, term()}
   def open(options) do
-    options = extract_new_options!(options)
+    options = extract_open_options!(options)
 
     {handler, args} = Keyword.fetch!(options, :handler)
     state = %State{
@@ -65,7 +65,7 @@ defmodule ExSip.Clients.UDP do
     end
   end
 
-  defp extract_new_options!(options) do
+  defp extract_open_options!(options) do
     {handler, args} = Keyword.fetch!(options, :handler)
 
     [
