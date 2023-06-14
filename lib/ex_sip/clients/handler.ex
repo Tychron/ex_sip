@@ -4,13 +4,13 @@ defmodule ExSip.Clients.Handler do
       @behaviour ExSip.Clients.Handler
 
       @doc false
-      def init(args) do
+      def init(args, _socket) do
         {:ok, args}
       end
 
       @doc false
-      def terminate(_reason, _state) do
-        :ok
+      def handle_closed(state) do
+        {:ok, state}
       end
 
       @doc false
@@ -28,21 +28,21 @@ defmodule ExSip.Clients.Handler do
   alias ExSip.Listeners.State
   alias ExSip.Message
 
-  @callback init(args::any()) :: {:ok, any()}
+  @callback init(:socket.socket(), any()) :: {:ok, any()} | {:error, term()}
 
-  @callback terminate(reason::any(), args::any()) :: any()
+  @callback handle_closed(args::any()) :: {:ok, any()}
 
-  @callback handle_message(Message.t(), state::any()) :: {:ok, any()}
+  @callback encode_message(Message.t(), state::any()) :: {:ok, iodata(), any()}
 
-  def init(args, %State{} = state) do
-    case state.handler.init(args) do
+  def init(args, socket, %State{} = state) do
+    case state.handler.init(args, socket) do
       {:ok, handler_state} ->
         {:ok, %{state | handler_state: handler_state}}
     end
   end
 
-  def terminate(reason, %State{} = state) do
-    case state.handler.terminate(reason, state.handler_state) do
+  def handle_closed(%State{} = state) do
+    case state.handler.handle_closed(state.handler_state) do
       {:ok, handler_state} ->
         {:ok, %{state | handler_state: handler_state}}
     end
