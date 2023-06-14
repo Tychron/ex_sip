@@ -4,10 +4,25 @@ defmodule ExSip.Listeners.UDP do
   use GenStateMachine, callback_mode: [:handle_event_function, :state_enter]
 
   alias ExSip.Listeners.State
-  alias ExSip.Handler
+  alias ExSip.Listeners.Handler
   alias ExSip.Message
 
   import ExSip.ErrorLogger
+
+  @server_key :__server__
+  @socket_key :__socket__
+
+  def reply(from, message) do
+    GenStateMachine.reply(from, message)
+  end
+
+  def call(pid, message, timeout) do
+    GenStateMachine.call(pid, {:__call__, message}, timeout)
+  end
+
+  def cast(pid, message) do
+    GenStateMachine.cast(pid, {:__cast__, message})
+  end
 
   def wait_for_bind(pid, timeout \\ :infinity) do
     GenStateMachine.call(pid, :wait_for_bind, timeout)
@@ -17,16 +32,31 @@ defmodule ExSip.Listeners.UDP do
     GenStateMachine.stop(pid, reason, timeout)
   end
 
-  def start_link({handler, args}, gen_options \\ []) when is_atom(handler) do
-    GenStateMachine.start_link(__MODULE__, {handler, args}, gen_options)
+  def start_link(options, gen_options \\ []) do
+    options = extract_start_options!(options)
+    GenStateMachine.start_link(__MODULE__, options, gen_options)
+  end
+
+  def start(options, gen_options \\ []) do
+    options = extract_start_options!(options)
+    GenStateMachine.start(__MODULE__, options, gen_options)
   end
 
   @impl true
-  def init({handler, args}) do
-    state = %State{handler: handler}
-    case Handler.init(args, state) do
+  def init(options) do
+    listener = Keyword.fetch!(options, :listener)
+    {handler, args} = Keyword.fetch!(options, :handler)
+
+    state = %State{
+      addr: Keyword.fetch!(listener, :addr),
+      handler: handler,
+    }
+    case Handler.init(:udp, args, state) do
       {:ok, state} ->
         {:ok, :open, state}
+
+      {:stop, reason, %State{} = _state} ->
+        {:stop, reason}
     end
   rescue ex ->
     log_error_and_reraise(ex, __STACKTRACE__)
@@ -43,14 +73,57 @@ defmodule ExSip.Listeners.UDP do
     log_error_and_reraise(ex, __STACKTRACE__)
   end
 
+  #
+  # General Exit handling
+  #
+
   @impl true
-  def handle_event(:enter, _old_state, :open, %State{} = state) do
-    send(self(), {:socket, :open})
+  def handle_event(:info, {:EXIT, pid, _reason} = message, _, %State{} = state) do
+    if pid == state.receiver do
+      case Handler.handle_unbound(state) do
+        {:noreply, state} ->
+          {:next_state, :reopen, %{state | receiver: nil}}
+      end
+    else
+      case Handler.handle_info(message, state) do
+        {:noreply, state} ->
+          {:keep_state, state}
+      end
+    end
+  end
+
+  #
+  # Reopen
+  #
+
+  @impl true
+  def handle_event(:enter, _old_state, :reopen, %State{} = state) do
+    send(self(), {@server_key, :socket, :reopen})
     {:keep_state, state}
   end
 
   @impl true
-  def handle_event(:info, {:socket, :open}, :open, %State{} = state) do
+  def handle_event(:info, {@server_key, :socket, :reopen}, :reopen, %State{} = state) do
+    if state.socket do
+      :socket.close(state.socket)
+    end
+    {:next_state, :open, %{state | socket: nil}}
+  rescue ex ->
+    log_error_and_reraise(ex, __STACKTRACE__)
+  end
+
+  #
+  # Open
+  #
+
+  @impl true
+  def handle_event(:enter, _old_state, :open, %State{} = state) do
+    send(self(), {@server_key, :socket, :open})
+    {:keep_state, state}
+  end
+
+  @impl true
+  def handle_event(:info, {@server_key, :socket, :open}, :open, %State{} = state) do
     options = %{}
     case :socket.open(:inet, :dgram, :udp, options) do
       {:ok, socket} ->
@@ -60,24 +133,27 @@ defmodule ExSip.Listeners.UDP do
     log_error_and_reraise(ex, __STACKTRACE__)
   end
 
+  #
+  # Bind
+  #
+
   @impl true
   def handle_event(:enter, _old_state, :bind, %State{} = state) do
-    send(self(), {:socket, :bind})
+    send(self(), {@server_key, :socket, :bind})
     {:keep_state, state}
   end
 
   @impl true
-  def handle_event(:info, {:socket, :bind}, :bind, %State{} = state) do
-    :ok = :socket.bind(state.socket, %{
-      family: :inet,
-      #port: 5100,
-      port: 5070,
-      addr: :any,
-    })
+  def handle_event(:info, {@server_key, :socket, :bind}, :bind, %State{} = state) do
+    :ok = :socket.bind(state.socket, state.addr)
     {:next_state, :loop, state}
   rescue ex ->
     log_error_and_reraise(ex, __STACKTRACE__)
   end
+
+  #
+  # Loop
+  #
 
   @impl true
   def handle_event(:enter, _old_state, :loop, %State{} = state) do
@@ -90,35 +166,45 @@ defmodule ExSip.Listeners.UDP do
           receiver_loop(parent, state.socket)
         end)
       }
-    send(self(), {:socket, :bound})
+    send(self(), {@server_key, :socket, :bound})
     {:keep_state, state}
   rescue ex ->
     log_error_and_reraise(ex, __STACKTRACE__)
   end
 
   @impl true
-  def handle_event(:info, {:socket, :bound}, :loop, %State{} = state) do
+  def handle_event(:info, {@server_key, :socket, :bound}, :loop, %State{} = state) do
     case Handler.handle_bound(state) do
-      {:ok, %State{} = state} ->
+      {:noreply, %State{} = state} ->
         state = flush_waiting_for_bind(state)
         {:keep_state, state}
+
+      {:stop, reason, %State{} = state} ->
+        {:stop, reason, state}
     end
   rescue ex ->
     log_error_and_reraise(ex, __STACKTRACE__)
   end
 
   @impl true
-  def handle_event(:info, {:received_data, blob}, :loop, %State{} = state) do
-    case Message.parse(blob) do
+  def handle_event(:info, {@socket_key, :received_data, source, blob}, :loop, %State{} = state) do
+    case Message.decode(blob) do
       {:ok, %Message{} = message} ->
-        case do_handle_message(message, state) do
+        case Handler.handle_message(source, message, state) do
           {:ok, state} ->
             {:keep_state, state}
+
+          {:stop, reason, state} ->
+            {:stop, reason, state}
         end
     end
   rescue ex ->
     log_error_and_reraise(ex, __STACKTRACE__)
   end
+
+  #
+  # Wait for Bind
+  #
 
   @impl true
   def handle_event({:call, from}, :wait_for_bind, :loop, %State{} = state) do
@@ -133,10 +219,56 @@ defmodule ExSip.Listeners.UDP do
     log_error_and_reraise(ex, __STACKTRACE__)
   end
 
+  #
+  # Fallback
+  #
+
+  @impl true
+  def handle_event({:call, from}, {:__call__, message}, _event_state, %State{} = state) do
+    case Handler.handle_call(message, from, state) do
+      {:noreply, state} ->
+        {:keep_state, state}
+
+      {:reply, reply, state} ->
+        {:keep_state, state, [{:reply, from, reply}]}
+
+      {:stop, reason, %State{} = state} ->
+        {:stop, reason, state}
+    end
+  rescue ex ->
+    log_error_and_reraise(ex, __STACKTRACE__)
+  end
+
+  @impl true
+  def handle_event(:cast, {:__cast__, message}, _event_state, %State{} = state) do
+    case Handler.handle_cast(message, state) do
+      {:noreply, state} ->
+        {:keep_state, state}
+
+      {:stop, reason, %State{} = state} ->
+        {:stop, reason, state}
+    end
+  rescue ex ->
+    log_error_and_reraise(ex, __STACKTRACE__)
+  end
+
+  @impl true
+  def handle_event(:info, message, _event_state, %State{} = state) do
+    case Handler.handle_info(message, state) do
+      {:noreply, state} ->
+        {:keep_state, state}
+
+      {:stop, reason, %State{} = state} ->
+        {:stop, reason, state}
+    end
+  rescue ex ->
+    log_error_and_reraise(ex, __STACKTRACE__)
+  end
+
   defp receiver_loop(parent, socket) do
-    case :socket.recv(socket) do
-      {:ok, blob} when is_binary(blob) ->
-        send(parent, {:received_data, blob})
+    case :socket.recvfrom(socket) do
+      {:ok, {source, blob}} when is_binary(blob) ->
+        send(parent, {@socket_key, :received_data, source, blob})
         receiver_loop(parent, socket)
 
       {:error, reason} ->
@@ -159,9 +291,16 @@ defmodule ExSip.Listeners.UDP do
     log_error_and_reraise(ex, __STACKTRACE__)
   end
 
-  defp do_handle_message(%Message{} = message, %State{} = state) do
-    Handler.handle_message(message, state)
-  rescue ex ->
-    log_error_and_reraise(ex, __STACKTRACE__)
+  defp extract_start_options!(options) do
+    listener = Keyword.fetch!(options, :listener)
+    {handler, args} = Keyword.fetch!(options, :handler)
+
+    [
+      listener: Enum.map(listener, fn
+        {:addr, value} = res when is_map(value) ->
+          res
+      end),
+      handler: {handler, args},
+    ]
   end
 end

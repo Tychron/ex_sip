@@ -1,7 +1,7 @@
-defmodule ExSip.Handler do
+defmodule ExSip.Clients.Handler do
   defmacro __using__(_opts) do
     quote do
-      @behaviour ExSip.Handler
+      @behaviour ExSip.Clients.Handler
 
       @doc false
       def init(args) do
@@ -14,16 +14,14 @@ defmodule ExSip.Handler do
       end
 
       @doc false
-      def handle_bound(state) do
-        {:ok, state}
+      def encode_message(message, state) do
+        case ExSip.Message.encode(message) do
+          {:ok, blob} ->
+            {:ok, blob, state}
+        end
       end
 
-      @doc false
-      def handle_message(_message, state) do
-        {:ok, state}
-      end
-
-      defoverridable [init: 1, terminate: 2, handle_bound: 1, handle_message: 2]
+      defoverridable [init: 1, terminate: 2, encode_message: 2]
     end
   end
 
@@ -33,8 +31,6 @@ defmodule ExSip.Handler do
   @callback init(args::any()) :: {:ok, any()}
 
   @callback terminate(reason::any(), args::any()) :: any()
-
-  @callback handle_bound(state::any()) :: {:ok, any()}
 
   @callback handle_message(Message.t(), state::any()) :: {:ok, any()}
 
@@ -52,17 +48,10 @@ defmodule ExSip.Handler do
     end
   end
 
-  def handle_bound(%State{} = state) do
-    case state.handler.handle_bound(state.handler_state) do
-      {:ok, handler_state} ->
-        {:ok, %{state | handler_state: handler_state}}
-    end
-  end
-
-  def handle_message(%Message{} = message, %State{} = state) do
-    case state.handler.handle_message(message, state.handler_state) do
-      {:ok, handler_state} ->
-        {:ok, %{state | handler_state: handler_state}}
+  def encode_message(%Message{} = message, %State{} = state) do
+    case state.handler.encode_message(message, state.handler_state) do
+      {:ok, blob, handler_state} ->
+        {:ok, blob, %{state | handler_state: handler_state}}
     end
   end
 end
