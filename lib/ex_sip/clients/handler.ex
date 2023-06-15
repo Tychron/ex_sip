@@ -21,14 +21,14 @@ defmodule ExSip.Clients.Handler do
         end
       end
 
-      defoverridable [init: 1, terminate: 2, encode_message: 2]
+      defoverridable ExSip.Clients.Handler
     end
   end
 
   alias ExSip.Listeners.State
   alias ExSip.Message
 
-  @callback init(:socket.socket(), any()) :: {:ok, any()} | {:error, term()}
+  @callback init(any(), :socket.socket()) :: {:ok, any()} | {:error, term()}
 
   @callback handle_closed(args::any()) :: {:ok, any()}
 
