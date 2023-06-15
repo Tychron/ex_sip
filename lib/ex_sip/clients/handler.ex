@@ -25,7 +25,7 @@ defmodule ExSip.Clients.Handler do
     end
   end
 
-  alias ExSip.Listeners.State
+  alias ExSip.Clients.State
   alias ExSip.Message
 
   @callback init(any(), :socket.socket()) :: {:ok, any()} | {:error, term()}

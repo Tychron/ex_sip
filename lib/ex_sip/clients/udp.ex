@@ -66,10 +66,11 @@ defmodule ExSip.Clients.UDP do
   end
 
   defp extract_open_options!(options) do
-    {handler, args} = Keyword.fetch!(options, :handler)
-
-    [
-      handler: {handler, args},
-    ]
+    case Keyword.fetch!(options, :handler) do
+      {handler, args} ->
+        [
+          handler: {handler, args},
+        ]
+    end
   end
 end
