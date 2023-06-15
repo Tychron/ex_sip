@@ -3,6 +3,52 @@ defmodule ExSip.MessageTest do
 
   alias ExSip.Message
 
+  describe "decode/1 & encode/1" do
+    test "can decode a message" do
+      blob = """
+      OPTIONS sip:12003005000@example.com SIP/2.0\r
+      Via: SIP/2.0/UDP 127.0.0.1:5060\r
+      From: <sip:555@127.0.0.1:5060>\r
+      To: <sip:12003005000@example.com>\r
+      Call-ID: abc@127.0.0.1:5060\r
+      CSeq: 101 OPTIONS\r
+      Content-Length: 0\r
+      \r
+      """
+
+      assert {:ok, message} = Message.decode(blob)
+
+      assert %Message{
+        type: :request,
+        start_line: %{
+          method: "OPTIONS",
+          url: "sip:12003005000@example.com",
+          version: "SIP/2.0",
+        },
+        headers: [
+          {"Via", "SIP/2.0/UDP 127.0.0.1:5060"},
+          {"From", "<sip:555@127.0.0.1:5060>"},
+          {"To", "<sip:12003005000@example.com>"},
+          {"Call-ID", "abc@127.0.0.1:5060"},
+          {"CSeq", "101 OPTIONS"},
+          {"Content-Length", "0"},
+        ]
+      } = message
+
+      {:ok, blob} = Message.encode(message)
+      assert """
+      OPTIONS sip:12003005000@example.com SIP/2.0\r
+      Via: SIP/2.0/UDP 127.0.0.1:5060\r
+      From: <sip:555@127.0.0.1:5060>\r
+      To: <sip:12003005000@example.com>\r
+      Call-ID: abc@127.0.0.1:5060\r
+      CSeq: 101 OPTIONS\r
+      Content-Length: 0\r
+      \r
+      """ == IO.iodata_to_binary(blob)
+    end
+  end
+
   describe "get_header/2 & put_header/3" do
     test "can put a new header in message" do
       message = %Message{}

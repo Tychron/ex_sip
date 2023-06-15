@@ -266,7 +266,7 @@ defmodule ExSip.Message do
       version: version,
     } = start_line
 
-    [method, "\s", url, "\s", version]
+    {:ok, [method, "\s", url, "\s", version]}
   end
 
   def encode_start_line(:response, start_line) do
@@ -276,7 +276,7 @@ defmodule ExSip.Message do
       reason: reason,
     } = start_line
 
-    [version, "\s", status_code, "\s", reason]
+    {:ok, [version, "\s", status_code, "\s", reason]}
   end
 
   def encode_headers(headers) do
