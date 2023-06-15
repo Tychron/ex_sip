@@ -102,22 +102,22 @@ defmodule ExSip.Message do
   end
 
   @spec unnormalize_header_key(String.t()) :: {:ok, String.t()} | :error
-  def unnormalize_header_key("allow"), do: "Allow"
-  def unnormalize_header_key("call-id"), do: "Call-ID"
-  def unnormalize_header_key("contact"), do: "Contact"
-  def unnormalize_header_key("content-disposition"), do: "Content-Disposition"
-  def unnormalize_header_key("content-length"), do: "Content-Length"
-  def unnormalize_header_key("content-type"), do: "Content-Type"
-  def unnormalize_header_key("cseq"), do: "CSeq"
-  def unnormalize_header_key("from"), do: "From"
-  def unnormalize_header_key("max-forwards"), do: "Max-Forwards"
-  def unnormalize_header_key("route"), do: "Route"
-  def unnormalize_header_key("server"), do: "Server"
-  def unnormalize_header_key("subject"), do: "Subject"
-  def unnormalize_header_key("supported"), do: "Supported"
-  def unnormalize_header_key("to"), do: "To"
-  def unnormalize_header_key("user-agent"), do: "User-Agent"
-  def unnormalize_header_key("via"), do: "Via"
+  def unnormalize_header_key("allow"), do: {:ok, "Allow"}
+  def unnormalize_header_key("call-id"), do: {:ok, "Call-ID"}
+  def unnormalize_header_key("contact"), do: {:ok, "Contact"}
+  def unnormalize_header_key("content-disposition"), do: {:ok, "Content-Disposition"}
+  def unnormalize_header_key("content-length"), do: {:ok, "Content-Length"}
+  def unnormalize_header_key("content-type"), do: {:ok, "Content-Type"}
+  def unnormalize_header_key("cseq"), do: {:ok, "CSeq"}
+  def unnormalize_header_key("from"), do: {:ok, "From"}
+  def unnormalize_header_key("max-forwards"), do: {:ok, "Max-Forwards"}
+  def unnormalize_header_key("route"), do: {:ok, "Route"}
+  def unnormalize_header_key("server"), do: {:ok, "Server"}
+  def unnormalize_header_key("subject"), do: {:ok, "Subject"}
+  def unnormalize_header_key("supported"), do: {:ok, "Supported"}
+  def unnormalize_header_key("to"), do: {:ok, "To"}
+  def unnormalize_header_key("user-agent"), do: {:ok, "User-Agent"}
+  def unnormalize_header_key("via"), do: {:ok, "Via"}
   def unnormalize_header_key(_) do
     :error
   end
