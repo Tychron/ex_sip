@@ -55,7 +55,7 @@ defmodule ExSip.Clients.UDP do
     end
   end
 
-  def send_to(%State{socket: socket} = state, blob, dest) when is_binary(blob) do
+  def send_to(%State{socket: socket} = state, blob, dest) when is_binary(blob) or is_list(blob) do
     case :socket.sendto(socket, blob, dest) do
       :ok ->
         {:ok, state}
@@ -63,10 +63,6 @@ defmodule ExSip.Clients.UDP do
       {:error, _reason} = err ->
         {err, state}
     end
-  end
-
-  def send_to(%State{} = state, blob, dest) when is_list(blob) do
-    send_to(state, IO.iodata_to_binary(blob), dest)
   end
 
   defp extract_open_options!(options) do

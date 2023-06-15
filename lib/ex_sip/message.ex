@@ -255,7 +255,7 @@ defmodule ExSip.Message do
       start_line, "\r\n",
       headers,
       "\r\n",
-      message.body
+      message.body || []
     ]}
   end
 
