@@ -73,6 +73,19 @@ defmodule ExSip.Headers.Via do
     end
   end
 
+  @spec get_parameter(t(), key::String.t()) :: any()
+  def get_parameter(%Via{} = via, key) do
+    ExSip.Proplist.get(via.parameters, key)
+  end
+
+  @spec put_parameter(t(), key::String.t(), value::any()) :: Via.t()
+  def put_parameter(%Via{} = via, key, value) do
+    %{
+      via
+      | parameters: ExSip.Proplist.put(via.parameters, key, value)
+    }
+  end
+
   defp decode_parameters(blob, options, acc \\ [])
 
   defp decode_parameters("" = rest, _options, acc) do
