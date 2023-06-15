@@ -7,6 +7,7 @@ defmodule ExSip.Listeners.State do
     waiting_for_bind: :queue.new(),
     socket: nil,
     receiver: nil,
+    retries: 0,
   ]
 
   @type t :: %__MODULE__{

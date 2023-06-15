@@ -101,10 +101,8 @@ defmodule ExSip.Listeners.Handler do
   end
 
   def terminate(reason, %State{} = state) do
-    case state.handler.terminate(reason, state.handler_state) do
-      {:ok, handler_state} ->
-        {:ok, %{state | handler_state: handler_state}}
-    end
+    state.handler.terminate(reason, state.handler_state)
+    {:ok, state}
   end
 
   def handle_unbound(%State{} = state) do

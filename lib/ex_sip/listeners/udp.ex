@@ -144,8 +144,19 @@ defmodule ExSip.Listeners.UDP do
 
   @impl true
   def handle_event(:info, {@server_key, :socket, :bind}, :bind, %State{} = state) do
-    :ok = :socket.bind(state.socket, state.addr)
-    {:next_state, :loop, state}
+    case :socket.bind(state.socket, state.addr) do
+      :ok ->
+        {:next_state, :loop, state}
+
+      {:error, :eaddrinuse} ->
+        Logger.error "address in use, trying again in 5 seconds"
+        if state.retries > 20 do
+          {:stop, :could_not_bind, state}
+        else
+          Process.send_after(self(), {@server_key, :socket, :bind}, :timer.seconds(5))
+          {:keep_state, %{state | retries: state.retries + 1}}
+        end
+    end
   rescue ex ->
     log_error_and_reraise(ex, __STACKTRACE__)
   end
@@ -162,8 +173,9 @@ defmodule ExSip.Listeners.UDP do
       %{
         state
         | receiver: spawn_link(fn ->
-          receiver_loop(parent, state.socket)
-        end)
+            receiver_loop(parent, state.socket)
+          end),
+          retries: 0
       }
     send(self(), {@server_key, :socket, :bound})
     {:keep_state, state}
