@@ -202,8 +202,14 @@ defmodule ExSip.Listeners.UDP do
     case Handler.decode_message(blob, state) do
       {:ok, message, %State{} = state} ->
         case Handler.handle_message(source, message, state) do
-          {:ok, %State{} = state} ->
-            {:keep_state, state}
+          {:ok, %State{} = state, actions} ->
+            case resolve_actions(actions, state) do
+              {:ok, state} ->
+                {:keep_state, state}
+
+              {:error, reason} ->
+                {:stop, reason, state}
+            end
 
           {:stop, reason, state} ->
             {:stop, reason, state}
@@ -316,5 +322,18 @@ defmodule ExSip.Listeners.UDP do
       end),
       handler: {handler, args},
     ]
+  end
+
+  defp resolve_actions(actions, %State{} = state) do
+    Enum.reduce_while(actions, state, fn
+      {:send, blob, dest}, {:ok, %State{} = state} ->
+        case :socket.sendto(state.socket, blob, dest) do
+          :ok ->
+            {:cont, {:ok, state}}
+
+          {:error, _} ->
+            {:cont, {:ok, state}}
+        end
+    end)
   end
 end

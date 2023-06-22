@@ -88,6 +88,7 @@ defmodule ExSip.Listeners.Handler do
 
   @callback handle_message(source::any(), Message.t(), state::any()) ::
     {:ok, any()}
+    | {:ok, any(), list()}
     | {:stop, reason::any(), any()}
 
   def init(transport, args, %State{} = state) do
@@ -165,7 +166,10 @@ defmodule ExSip.Listeners.Handler do
   def handle_message(source, %Message{} = message, %State{} = state) do
     case state.handler.handle_message(source, message, state.handler_state) do
       {:ok, handler_state} ->
-        {:ok, %{state | handler_state: handler_state}}
+        {:ok, %{state | handler_state: handler_state}, []}
+
+      {:ok, handler_state, actions} ->
+        {:ok, %{state | handler_state: handler_state}, actions}
 
       {:stop, reason, handler_state} ->
         {:stop, reason, %{state | handler_state: handler_state}}
