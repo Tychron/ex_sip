@@ -324,9 +324,9 @@ defmodule ExSip.Listeners.UDP do
     ]
   end
 
-  defp resolve_actions(actions, %State{} = state) do
-    Enum.reduce_while(actions, state, fn
-      {:send, blob, dest}, {:ok, %State{} = state} ->
+  defp resolve_actions(actions, %State{} = state) when is_list(actions) do
+    Enum.reduce_while(actions, {:ok, state}, fn
+      {:send_to, blob, dest}, {:ok, %State{} = state} ->
         case :socket.sendto(state.socket, blob, dest) do
           :ok ->
             {:cont, {:ok, state}}
