@@ -55,8 +55,17 @@ defmodule ExSip.Headers.Via do
                           [sip_uri, parameters] ->
                             via = %{via | url: sip_uri}
 
-                            case decode_parameters(parameters, options) do
-                              {:ok, parameters, rest} ->
+                            case ExSip.RFC2045.Attributes.parse(";" <> parameters) do
+                              {parameters, rest} ->
+                                parameters =
+                                  if options[:normalize_parameters] do
+                                    Enum.map(parameters, fn {key, value} ->
+                                      {String.downcase(key), value}
+                                    end)
+                                  else
+                                    parameters
+                                  end
+
                                 {:ok, %{via | parameters: parameters}, rest}
                             end
                         end
@@ -84,77 +93,5 @@ defmodule ExSip.Headers.Via do
       via
       | parameters: ExSip.Proplist.put(via.parameters, key, value)
     }
-  end
-
-  defp decode_parameters(blob, options, acc \\ [])
-
-  defp decode_parameters("" = rest, _options, acc) do
-    {:ok, Enum.reverse(acc), rest}
-  end
-
-  defp decode_parameters(blob, options, acc) do
-    case :binary.split(blob, "=") do
-      [key, rest] ->
-        case decode_parameter_value(rest) do
-          {:ok, value, rest} ->
-            key =
-              if options[:normalize_parameters] do
-                String.downcase(key)
-              else
-                key
-              end
-
-            decode_parameters(rest, options, [{key, value} | acc])
-        end
-    end
-  end
-
-  @spec decode_parameter_value(binary(), atom(), list()) ::
-    {:ok, value::binary(), rest::binary()}
-    | {:error, :unterminated_dquote}
-  defp decode_parameter_value(blob, state \\ :start, acc \\ [])
-
-  defp decode_parameter_value(rest, :end, acc) do
-    {:ok, IO.iodata_to_binary(Enum.reverse(acc)), rest}
-  end
-
-  defp decode_parameter_value(<<"\"", rest::binary>>, :start, acc) do
-    decode_parameter_value(rest, :dquote, acc)
-  end
-
-  defp decode_parameter_value(rest, :start, acc) do
-    decode_parameter_value(rest, :term, acc)
-  end
-
-  defp decode_parameter_value(<<>>, :dquote, _acc) do
-    {:error, :unterminated_dquote}
-  end
-
-  defp decode_parameter_value(<<"\\\"", rest::binary>>, :dquote, acc) do
-    decode_parameter_value(rest, :dquote, ["\"" | acc])
-  end
-
-  defp decode_parameter_value(<<"\"", rest::binary>>, :dquote, acc) do
-    decode_parameter_value(rest, :end, acc)
-  end
-
-  defp decode_parameter_value(<<c::utf8, rest::binary>>, :dquote, acc) do
-    decode_parameter_value(rest, :dquote, [<<c::utf8>> | acc])
-  end
-
-  defp decode_parameter_value(<<"\s", rest::binary>>, :term, acc) do
-    decode_parameter_value(rest, :end, acc)
-  end
-
-  defp decode_parameter_value(<<";", rest::binary>>, :term, acc) do
-    decode_parameter_value(rest, :end, acc)
-  end
-
-  defp decode_parameter_value(<<>> = rest, :term, acc) do
-    decode_parameter_value(rest, :end, acc)
-  end
-
-  defp decode_parameter_value(<<c::utf8, rest::binary>>, :term, acc) do
-    decode_parameter_value(rest, :term, [<<c::utf8>> | acc])
   end
 end
