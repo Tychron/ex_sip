@@ -246,11 +246,17 @@ defmodule ExSip.Listeners.UDP do
   @impl true
   def handle_event({:call, from}, {:__call__, message}, _event_state, %State{} = state) do
     case Handler.handle_call(message, from, state) do
-      {:noreply, state} ->
-        {:keep_state, state}
+      {:noreply, state, actions} ->
+        case resolve_actions(actions, state) do
+          {:ok, state} ->
+            {:keep_state, state}
+        end
 
-      {:reply, reply, state} ->
-        {:keep_state, state, [{:reply, from, reply}]}
+      {:reply, reply, state, actions} ->
+        case resolve_actions(actions, state) do
+          {:ok, state} ->
+            {:keep_state, state, [{:reply, from, reply}]}
+        end
 
       {:stop, reason, %State{} = state} ->
         {:stop, reason, state}
@@ -262,8 +268,11 @@ defmodule ExSip.Listeners.UDP do
   @impl true
   def handle_event(:cast, {:__cast__, message}, _event_state, %State{} = state) do
     case Handler.handle_cast(message, state) do
-      {:noreply, state} ->
-        {:keep_state, state}
+      {:noreply, state, actions} ->
+        case resolve_actions(actions, state) do
+          {:ok, state} ->
+            {:keep_state, state}
+        end
 
       {:stop, reason, %State{} = state} ->
         {:stop, reason, state}
@@ -275,8 +284,11 @@ defmodule ExSip.Listeners.UDP do
   @impl true
   def handle_event(:info, message, _event_state, %State{} = state) do
     case Handler.handle_info(message, state) do
-      {:noreply, state} ->
-        {:keep_state, state}
+      {:noreply, state, actions} ->
+        case resolve_actions(actions, state) do
+          {:ok, state} ->
+            {:keep_state, state}
+        end
 
       {:stop, reason, %State{} = state} ->
         {:stop, reason, state}

@@ -61,6 +61,10 @@ defmodule ExSip.Listeners.Handler do
   alias ExSip.Listeners.State
   alias ExSip.Message
 
+  @type action :: {:send_to, iodata(), dest::any()}
+
+  @type actions :: [action()]
+
   @callback init(:udp | :tcp, args::any()) :: {:ok, any()}
 
   @callback terminate(reason::any(), args::any()) :: any()
@@ -71,15 +75,19 @@ defmodule ExSip.Listeners.Handler do
 
   @callback handle_call(message::any(), from::any(), state::any()) ::
     {:noreply, any()}
+    | {:noreply, any(), actions()}
     | {:reply, any(), any()}
+    | {:reply, any(), any(), actions()}
     | {:stop, reason::any(), any()}
 
   @callback handle_cast(message::any(), state::any()) ::
     {:noreply, any()}
+    | {:noreply, any(), actions()}
     | {:stop, reason::any(), any()}
 
   @callback handle_info(message::any(), state::any()) ::
     {:noreply, any()}
+    | {:noreply, any(), actions()}
     | {:stop, reason::any(), any()}
 
   @callback decode_message(blob::binary(), state::any()) ::
@@ -88,7 +96,7 @@ defmodule ExSip.Listeners.Handler do
 
   @callback handle_message(source::any(), Message.t(), state::any()) ::
     {:ok, any()}
-    | {:ok, any(), list()}
+    | {:ok, any(), actions()}
     | {:stop, reason::any(), any()}
 
   def init(transport, args, %State{} = state) do
@@ -123,10 +131,16 @@ defmodule ExSip.Listeners.Handler do
   def handle_call(message, from, %State{} = state) do
     case state.handler.handle_call(message, from, state.handler_state) do
       {:noreply, handler_state} ->
-        {:noreply, %{state | handler_state: handler_state}}
+        {:noreply, %{state | handler_state: handler_state}, []}
+
+      {:noreply, handler_state, actions} ->
+        {:noreply, %{state | handler_state: handler_state}, actions}
 
       {:reply, reply, handler_state} ->
-        {:reply, reply, %{state | handler_state: handler_state}}
+        {:reply, reply, %{state | handler_state: handler_state}, []}
+
+      {:reply, reply, handler_state, actions} ->
+        {:reply, reply, %{state | handler_state: handler_state}, actions}
 
       {:stop, reason, handler_state} ->
         {:stop, reason, %{state | handler_state: handler_state}}
@@ -136,7 +150,10 @@ defmodule ExSip.Listeners.Handler do
   def handle_cast(message, %State{} = state) do
     case state.handler.handle_cast(message, state.handler_state) do
       {:noreply, handler_state} ->
-        {:noreply, %{state | handler_state: handler_state}}
+        {:noreply, %{state | handler_state: handler_state}, []}
+
+      {:noreply, handler_state, actions} ->
+        {:noreply, %{state | handler_state: handler_state}, actions}
 
       {:stop, reason, handler_state} ->
         {:stop, reason, %{state | handler_state: handler_state}}
@@ -146,7 +163,10 @@ defmodule ExSip.Listeners.Handler do
   def handle_info(message, %State{} = state) do
     case state.handler.handle_info(message, state.handler_state) do
       {:noreply, handler_state} ->
-        {:noreply, %{state | handler_state: handler_state}}
+        {:noreply, %{state | handler_state: handler_state}, []}
+
+      {:noreply, handler_state, actions} ->
+        {:noreply, %{state | handler_state: handler_state}, actions}
 
       {:stop, reason, handler_state} ->
         {:stop, reason, %{state | handler_state: handler_state}}
