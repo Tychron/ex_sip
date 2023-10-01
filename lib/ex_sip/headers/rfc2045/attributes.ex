@@ -16,7 +16,7 @@ defmodule ExSip.RFC2045.Attributes do
   """
   @type attribute :: {key::binary(), attribute_value()}
 
-  @token_regex ~r/\A[!#\$%&'*+\-\.0-9A-Z\^_`a-z|~]+/
+  @token_regex ~r/\A[!#\$%&'*+\-\.0-9A-Z\^_`a-z|~\/]+/
 
   @spec parse_token(binary) :: {binary, binary} | nil
   def parse_token(binary) do
